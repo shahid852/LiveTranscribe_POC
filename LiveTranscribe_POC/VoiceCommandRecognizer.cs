@@ -17,6 +17,7 @@ namespace LiveTranscribe_POC
             // Create a grammar for recognizing the command "start dictation", "transfer my text"
             var choices = new Choices();
             choices.Add("start dictation");
+            choices.Add("show overlay");
             choices.Add("transfer my text");
 
             var grammarBuilder = new GrammarBuilder();
@@ -33,7 +34,7 @@ namespace LiveTranscribe_POC
 
         private static void Recognizer_SpeechRecognized(object sender, SpeechRecognizedEventArgs e)
         {
-            if (e.Result.Confidence > 0.8)
+            if (e.Result.Confidence > 0.7)
             {
                 OnVoiceCommandRecognized?.Invoke(e.Result.Text);
             }

@@ -32,6 +32,7 @@
             this.btnTransfer = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
             this.txtCorrected = new System.Windows.Forms.RichTextBox();
+            this.btnHide = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // lblInterimText
@@ -42,6 +43,7 @@
             this.lblInterimText.Name = "lblInterimText";
             this.lblInterimText.Size = new System.Drawing.Size(0, 25);
             this.lblInterimText.TabIndex = 1;
+            this.lblInterimText.Visible = false;
             // 
             // btnTransfer
             // 
@@ -49,7 +51,7 @@
             this.btnTransfer.Location = new System.Drawing.Point(934, 556);
             this.btnTransfer.Margin = new System.Windows.Forms.Padding(6);
             this.btnTransfer.Name = "btnTransfer";
-            this.btnTransfer.Size = new System.Drawing.Size(150, 44);
+            this.btnTransfer.Size = new System.Drawing.Size(150, 49);
             this.btnTransfer.TabIndex = 2;
             this.btnTransfer.Text = "&Transfer";
             this.btnTransfer.UseVisualStyleBackColor = true;
@@ -58,7 +60,7 @@
             // btnCancel
             // 
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnCancel.Location = new System.Drawing.Point(772, 556);
+            this.btnCancel.Location = new System.Drawing.Point(13, 556);
             this.btnCancel.Margin = new System.Windows.Forms.Padding(6);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(150, 44);
@@ -76,6 +78,16 @@
             this.txtCorrected.Text = "";
             this.txtCorrected.TextChanged += new System.EventHandler(this.txtCorrected_TextChanged);
             // 
+            // btnHide
+            // 
+            this.btnHide.Location = new System.Drawing.Point(785, 556);
+            this.btnHide.Name = "btnHide";
+            this.btnHide.Size = new System.Drawing.Size(140, 47);
+            this.btnHide.TabIndex = 4;
+            this.btnHide.Text = "&Hide";
+            this.btnHide.UseVisualStyleBackColor = true;
+            this.btnHide.Click += new System.EventHandler(this.btnHide_Click);
+            // 
             // OverlayWindow
             // 
             this.AcceptButton = this.btnTransfer;
@@ -83,6 +95,7 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = this.btnCancel;
             this.ClientSize = new System.Drawing.Size(1099, 615);
+            this.Controls.Add(this.btnHide);
             this.Controls.Add(this.txtCorrected);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnTransfer);
@@ -94,7 +107,7 @@
             this.Name = "OverlayWindow";
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
-            this.Text = "Speech to Text";
+            this.Text = "Dictate";
             this.TopMost = true;
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.OverlayWindow_FormClosing);
             this.ResumeLayout(false);
@@ -108,5 +121,6 @@
         private System.Windows.Forms.Button btnTransfer;
         private System.Windows.Forms.Button btnCancel;
         private System.Windows.Forms.RichTextBox txtCorrected;
+        private System.Windows.Forms.Button btnHide;
     }
 }

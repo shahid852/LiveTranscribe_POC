@@ -8,6 +8,7 @@ using Polly;
 using RestSharp;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -23,7 +24,7 @@ namespace LiveTranscribe_POC
 {
     public partial class GSTT : Form
     {
-        private static readonly HttpClient httpClient = new HttpClient();
+        private readonly HttpClient httpClient;
         private string googleApplicationCredentials;
         private string openaiApiKey;
         private string googleGeminiApiKey;
@@ -37,9 +38,10 @@ namespace LiveTranscribe_POC
         public string lastTranscribedText = "";
         public string interimText = "";
         private OverlayWindow overlayWindow;
-        private ComboBox correctionServiceDropdown;
-        private string[] correctionServices = { "Gemini", "OpenAI", "Microsoft" };
-        private List<string> correctionTriggers = new List<string> { ".", ",", "\n" };
+
+
+        private List<string> correctionTriggers = new List<string> { "full stop", "new paragraph" };
+        OpenAIService openAIService;
 
         public Dictionary<string, string> correctionQueue { get; set; }
 
@@ -63,13 +65,17 @@ namespace LiveTranscribe_POC
         public GSTT()
         {
             InitializeComponent();
+            this.cmbOpenAIModels.SelectedIndex = 0;
+            this.correctionServiceDropdown.SelectedIndex = 0;
 
+            httpClient = new HttpClient();
             // Retrieve the API keys from environment variables
             googleApplicationCredentials = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
             openaiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
             googleGeminiApiKey = Environment.GetEnvironmentVariable("GOOGLE_GENAI_API_KEY");
             azureApiKey = Environment.GetEnvironmentVariable("AZURE_API_KEY");
             azureEndpoint = Environment.GetEnvironmentVariable("AZURE_ENDPOINT");
+            openAIService = new OpenAIService(openaiApiKey, cmbOpenAIModels.SelectedItem.ToString());
 
             if (string.IsNullOrEmpty(googleApplicationCredentials) || string.IsNullOrEmpty(openaiApiKey) || string.IsNullOrEmpty(googleGeminiApiKey) || string.IsNullOrEmpty(azureApiKey) || string.IsNullOrEmpty(azureEndpoint))
             {
@@ -90,17 +96,12 @@ namespace LiveTranscribe_POC
             overlayWindow.parentWindow = this;
             overlayWindow.TransferClicked += TransferTextToFocusedWindow;
 
-            // Add correction service dropdown
-            correctionServiceDropdown = new ComboBox();
-            correctionServiceDropdown.Items.AddRange(correctionServices);
-            correctionServiceDropdown.SelectedIndex = 0; // Default to Gemini
-            correctionServiceDropdown.Location = new Point(350, 60); // Adjust the location as needed
-            this.Controls.Add(correctionServiceDropdown);
             correctionQueue = new Dictionary<string, string>();
+           
 
             // Add event listener for voice command "start dictation"
-            VoiceCommandRecognizer.OnVoiceCommandRecognized += VoiceCommandRecognized;
-            VoiceCommandRecognizer.StartListening();
+            //VoiceCommandRecognizer.OnVoiceCommandRecognized += VoiceCommandRecognized;
+            //VoiceCommandRecognizer.StartListening();
 
             cancellationTokenSource = new CancellationTokenSource();
             waveIn.StartRecording();
@@ -239,9 +240,10 @@ namespace LiveTranscribe_POC
             txtTranscribed.Text = lastTranscribedText + " " + interimText;
 
             overlayWindow.UpdateInterimFinalText(" " + interimText, IsInterim: true);
-            
+
             txtTranscribed.Select(txtTranscribed.Text.Length, 0); //move cursor to the end
 
+            ShowOverlayWindow();
         }
 
         public void ProcessFinalResult(string finalText, bool kbinput = false)
@@ -261,8 +263,8 @@ namespace LiveTranscribe_POC
 
                 if (EndsWithCorrectionTrigger(txtTranscribed.Text))
                 {
-                    correctedIndex = findTriggerLastIndex(txtTranscribed.Text.Remove(txtTranscribed.Text.Length - 1)); //omit the current trigger
-                    string sendForCorrection = correctedIndex == 0 ? txtTranscribed.Text : txtTranscribed.Text.Substring(correctedIndex + 1);
+                    int startIndex = findTriggerLastIndex(txtTranscribed.Text.Remove(txtTranscribed.Text.Length - 1)); //omit the current trigger
+                    string sendForCorrection = correctedIndex == 0 ? txtTranscribed.Text : txtTranscribed.Text.Substring(startIndex + 1);
                     //first  time send all text as there is no previous cutoff found
 
                     SendForCorrection(sendForCorrection, kbinput);
@@ -272,7 +274,16 @@ namespace LiveTranscribe_POC
         }
         private string makeReplacements(string text)
         {
-            text = text.Trim().Replace("comma", ",").Replace("new paragraph", "\n").Replace("full stop", ".").Replace("start dictation", "");
+
+            // text = text.ToLower().Trim().Replace("comma", ",")
+            //     .Replace("new paragraph", "\n")
+            //     .Replace("full stop", ".")
+            //     .Replace("exclamation mark", "!")
+            //     .Replace("question mark", "?")
+            //     .Replace("start dictation", "")
+            //     
+            //
+            //     ;
             return text;
         }
         private bool EndsWithCorrectionTrigger(string text)
@@ -289,7 +300,6 @@ namespace LiveTranscribe_POC
         }
         int findTriggerLastIndex(string full_text)
         {
-
             List<int> last_indices = new List<int>();
             foreach (var trigger in correctionTriggers)
             {
@@ -297,8 +307,12 @@ namespace LiveTranscribe_POC
                 if (lastIndex > 0)
                     last_indices.Add(lastIndex);
             }
+            int foundIndex = last_indices.Count > 0 ? last_indices.Max() : 0;
 
-            return last_indices.Count > 0 ? last_indices.Max() : 0;
+            if (foundIndex > correctedIndex) // there is some (final) text which was not sent for correction 
+                return correctedIndex;
+            else
+                return foundIndex;
         }
 
         private async void SendForCorrection(string input_text, bool kbinput = false)
@@ -311,6 +325,7 @@ namespace LiveTranscribe_POC
                 txtCorrected.Select(txtCorrected.Text.Length, 0); //move cursor to the end
                 correctionQueue[input_text] = correctedText;
                 overlayWindow.UpdateCorrectedText(input_text);
+                correctedIndex = txtTranscribed.Text.Length;
             }
         }
 
@@ -331,68 +346,12 @@ namespace LiveTranscribe_POC
             }
         }
 
-        private async Task<string> CorrectGrammarWithOpenAI(string text)
+        private async Task<string> CorrectGrammarWithOpenAI(string input_text)
         {
-            var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-            var client = new RestClient("https://api.openai.com/v1/chat/completions");
-
-            var request = new RestRequest { Method = Method.Post };
-            request.AddHeader("Authorization", $"Bearer {apiKey}");
-            request.AddHeader("Content-Type", "application/json");
-
-            var data = new
-            {
-                model = "gpt-3.5-turbo",
-                messages = new[]
-                {
-                    new
-                    {
-                        role = "system",
-                        content = "You are a helpful assistant that corrects grammatical errors."
-                    },
-                    new
-                    {
-                        role = "user",
-                        content = $"Rewrite the following sentence and fix any grammar issues:\n\n{text}"
-                    }
-                },
-                max_tokens = 256,
-                temperature = 0.4,
-            };
-
-            request.AddJsonBody(data);
-
-            var policy = Policy.Handle<HttpRequestException>()
-                               .Or<Exception>() // Handle any other potential exceptions
-                               .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                                   (exception, timeSpan, retryCount, context) =>
-                                   {
-                                       LogError($"Retry {retryCount} encountered an error: {exception.Message}. Waiting {timeSpan} before next retry.");
-                                   });
-
-            var response = await policy.ExecuteAsync(async () =>
-            {
-                var httpResponse = await client.ExecuteAsync(request);
-                if (!httpResponse.IsSuccessful)
-                {
-                    LogError($"HTTP Request Failed: {httpResponse.StatusCode}, {httpResponse.Content}");
-                    throw new HttpRequestException(httpResponse.ErrorMessage);
-                }
-                return httpResponse.Content;
-            });
-
-            dynamic jsonResult = JsonConvert.DeserializeObject(response);
-
-            if (jsonResult.choices != null && jsonResult.choices.Count > 0)
-            {
-                return jsonResult.choices[0].message.content.ToString().Trim();
-            }
-            else
-            {
-                LogError("Error: No candidates returned.");
-                return text;
-            }
+            return await openAIService.CorrectGrammarWithOpenAI(input_text);
         }
+
+
 
         private async Task<string> CorrectGrammarWithGemini(string text)
         {
@@ -496,28 +455,30 @@ namespace LiveTranscribe_POC
         public void TransferTextToFocusedWindow(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
-            //IntPtr focusedWindowHandle = GetForegroundWindow();
-            
+            //IntPtr
+            //focusedWindowHandle = GetForegroundWindow();
+
             Clipboard.SetText(text);
 
             SetForegroundWindow(focusedWindowHandle);
             SendKeys.SendWait("^v");
 
-            Clipboard.Clear();
+            //Clipboard.Clear();
         }
 
-        private void VoiceCommandRecognized(string command)
-        {
-            if (command.Equals("start dictation", StringComparison.OrdinalIgnoreCase))
-            {
-                ShowOverlayWindow();
-            }
-            else if (command.Equals("transfer my text", StringComparison.OrdinalIgnoreCase))
-            {
+        //private void VoiceCommandRecognized(string command)
+        //{
+        //    if (command.Equals("start dictation", StringComparison.OrdinalIgnoreCase)
+        //        || command.Equals("show overlay", StringComparison.OrdinalIgnoreCase))
+        //    {
+        //        ShowOverlayWindow();
+        //    }
+        //    else if (command.Equals("transfer my text", StringComparison.OrdinalIgnoreCase))
+        //    {
 
-                TransferTextToFocusedWindow(txtCorrected.Text);
-            }
-        }
+        //        TransferTextToFocusedWindow(txtCorrected.Text);
+        //    }
+        //}
 
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -529,28 +490,28 @@ namespace LiveTranscribe_POC
 
         private void ShowOverlayWindow()
         {
-            if (overlayWindow != null)
+            if (overlayWindow != null && !overlayWindow.Visible)
             {
 
-               focusedWindowHandle = GetForegroundWindow();
+                focusedWindowHandle = GetForegroundWindow();
 
-               if (focusedWindowHandle != IntPtr.Zero)
-                {
-
-
-
-                    // Show the modal form
-                    //            overlayWindow.ShowDialog();
+                //if (focusedWindowHandle != IntPtr.Zero)
+                //{
 
 
-                    //overlayWindow.TopMost = true;
 
-                    // Show the modal form
-                    overlayWindow.ShowDialog();
+                // Show the modal form
+                //            overlayWindow.ShowDialog();
 
-                    // Reset the TopMost property after showing the dialog
-                    //overlayWindow.TopMost = false;
-                }
+
+                //overlayWindow.TopMost = true;
+
+                // Show the modal form
+                overlayWindow.Show();
+
+                // Reset the TopMost property after showing the dialog
+                //overlayWindow.TopMost = false;
+                //}
             }
         }
 
@@ -573,7 +534,7 @@ namespace LiveTranscribe_POC
             //notifyIcon.Visible = false;
         }
 
-        
+
         private void Exit_Click(object sender, EventArgs e)
         {
             Application.Exit();
@@ -588,6 +549,16 @@ namespace LiveTranscribe_POC
             transcribedIndex = 0;
             correctedIndex = 0;
             correctionQueue.Clear();
+        }
+
+        private void showOverlayToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            ShowOverlayWindow();
+        }
+
+        private void hideOverlayToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            overlayWindow.Hide();
         }
     }
 }

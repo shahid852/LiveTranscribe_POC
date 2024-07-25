@@ -101,5 +101,10 @@ namespace LiveTranscribe_POC
             this.Hide();
             ClearAll();
         }
+
+        private void btnHide_Click(object sender, EventArgs e)
+        {
+            this.Hide();
+        }
     }
 }
