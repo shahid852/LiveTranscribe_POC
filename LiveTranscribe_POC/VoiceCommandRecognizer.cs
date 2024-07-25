@@ -14,9 +14,10 @@ namespace LiveTranscribe_POC
         {
             recognizer = new SpeechRecognitionEngine();
 
-            // Create a grammar for recognizing the command "start dictation"
+            // Create a grammar for recognizing the command "start dictation", "transfer my text"
             var choices = new Choices();
             choices.Add("start dictation");
+            choices.Add("transfer my text");
 
             var grammarBuilder = new GrammarBuilder();
             grammarBuilder.Append(choices);

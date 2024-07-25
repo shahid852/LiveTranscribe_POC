@@ -1,20 +1,23 @@
-﻿using Google.Cloud.Speech.V1;
+﻿using GenerativeAI.Models;
+using GenerativeAI.Types;
+using Google.Cloud.Speech.V1;
+using Grpc.Core;
+using NAudio.Wave;
 using Newtonsoft.Json;
 using Polly;
-using NAudio.Wave;
 using RestSharp;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Grpc.Core;
-using GenerativeAI.Models;
-using GenerativeAI.Types;
+using System.Xml;
 
 namespace LiveTranscribe_POC
 {
@@ -31,12 +34,30 @@ namespace LiveTranscribe_POC
         private MemoryStream memoryStream;
         private CancellationTokenSource cancellationTokenSource;
         private SpeechClient speechClient;
-        private string lastTranscribedText = "";
-        private string interimText = "";
+        public string lastTranscribedText = "";
+        public string interimText = "";
         private OverlayWindow overlayWindow;
         private ComboBox correctionServiceDropdown;
         private string[] correctionServices = { "Gemini", "OpenAI", "Microsoft" };
         private List<string> correctionTriggers = new List<string> { ".", ",", "\n" };
+
+        public Dictionary<string, string> correctionQueue { get; set; }
+
+        private int _correctedIndex = 0;
+        public int correctedIndex
+        {
+            get { return _correctedIndex; }
+            set { _correctedIndex = value; }
+        }
+
+        private int _transcribedIndex;
+
+        public int transcribedIndex
+        {
+            get { return _transcribedIndex; }
+            set { _transcribedIndex = value; }
+        }
+
 
         public GSTT()
         {
@@ -55,7 +76,7 @@ namespace LiveTranscribe_POC
                 Environment.Exit(1);
             }
 
-            Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", googleApplicationCredentials);
+            //Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", googleApplicationCredentials);
 
             waveIn = new WaveInEvent
             {
@@ -65,6 +86,7 @@ namespace LiveTranscribe_POC
             waveIn.DataAvailable += OnDataAvailable;
 
             overlayWindow = new OverlayWindow();
+            overlayWindow.parentWindow = this;
             overlayWindow.TransferClicked += TransferTextToFocusedWindow;
 
             // Add correction service dropdown
@@ -73,10 +95,18 @@ namespace LiveTranscribe_POC
             correctionServiceDropdown.SelectedIndex = 0; // Default to Gemini
             correctionServiceDropdown.Location = new Point(350, 60); // Adjust the location as needed
             this.Controls.Add(correctionServiceDropdown);
+            correctionQueue = new Dictionary<string, string>();
 
             // Add event listener for voice command "start dictation"
             VoiceCommandRecognizer.OnVoiceCommandRecognized += VoiceCommandRecognized;
             VoiceCommandRecognizer.StartListening();
+
+            cancellationTokenSource = new CancellationTokenSource();
+            waveIn.StartRecording();
+            RecognizeSpeech(cancellationTokenSource.Token);
+            isRecording = true;
+            btnStartStop.Text = "Stop Recording";
+            lblStatus.Text = "Listening...";
         }
 
         private void OnDataAvailable(object sender, WaveInEventArgs e)
@@ -206,44 +236,75 @@ namespace LiveTranscribe_POC
         {
             this.interimText = interimText;
             txtTranscribed.Text = lastTranscribedText + " " + interimText;
-            overlayWindow.UpdateInterimText(lastTranscribedText + " " + interimText);
+
+            overlayWindow.UpdateInterimFinalText(" "+interimText, IsInterim: true);
         }
 
-        private void ProcessFinalResult(string finalText)
+        public void ProcessFinalResult(string finalText, bool kbinput = false)
         {
+            finalText = makeReplacements(finalText);
+
             if (!string.IsNullOrEmpty(finalText.Trim()))
             {
+
                 lastTranscribedText += " " + finalText;
                 txtTranscribed.Text = lastTranscribedText;
-                overlayWindow.UpdateInterimText(lastTranscribedText);
 
-                if (ContainsCorrectionTrigger(finalText))
+
+                overlayWindow.UpdateInterimFinalText(" " + finalText, false);
+
+                transcribedIndex = txtTranscribed.Text.Length;
+
+                if (EndsWithCorrectionTrigger(txtTranscribed.Text))
                 {
-                    SendForCorrection(lastTranscribedText);
+                    correctedIndex = findTriggerLastIndex(txtTranscribed.Text.Remove(txtTranscribed.Text.Length - 1)); //omit the current trigger
+                    string sendForCorrection = correctedIndex == 0 ? txtTranscribed.Text : txtTranscribed.Text.Substring(correctedIndex + 1);
+                    //first  time send all text as there is no previous cutoff found
+
+                    SendForCorrection(sendForCorrection, kbinput);
                 }
             }
         }
-
-        private bool ContainsCorrectionTrigger(string text)
+        private string makeReplacements(string text)
         {
+            text = text.Trim().Replace("comma", ",").Replace("new paragraph", "\n").Replace("full stop", ".").Replace("start dictation", "");
+            return text;
+        }
+        private bool EndsWithCorrectionTrigger(string text)
+        {
+
             foreach (var trigger in correctionTriggers)
             {
-                if (text.Contains(trigger))
+                if (text.EndsWith(trigger))
                 {
                     return true;
                 }
             }
             return false;
         }
-
-        private async void SendForCorrection(string text)
+        int findTriggerLastIndex(string full_text)
         {
-            if (!string.IsNullOrEmpty(text.Trim()))
+
+            List<int> last_indices = new List<int>();
+            foreach (var trigger in correctionTriggers)
             {
-                string correctedText = await CorrectGrammar(text);
-                txtCorrected.Text = correctedText;
-                overlayWindow.UpdateCorrectedText(correctedText);
-                lastTranscribedText = "";
+                int lastIndex = full_text.LastIndexOf(trigger);
+                if (lastIndex > 0)
+                    last_indices.Add(lastIndex);
+            }
+
+            return last_indices.Count > 0 ? last_indices.Max() : 0;
+        }
+
+        private async void SendForCorrection(string input_text, bool kbinput = false)
+        {
+            if (!string.IsNullOrEmpty(input_text.Trim()))
+            {
+                correctionQueue[input_text] = "";
+                string correctedText = await CorrectGrammar(input_text);
+                txtCorrected.Text += correctedText;
+                correctionQueue[input_text] = correctedText;
+                overlayWindow.UpdateCorrectedText(input_text);
             }
         }
 
@@ -416,13 +477,25 @@ namespace LiveTranscribe_POC
             }
         }
 
-        private void TransferTextToFocusedWindow(string text)
+        public void LogCorrection(string key)
+        {
+            string filePath = "corrections_log.txt";
+            using (StreamWriter writer = new StreamWriter(filePath, true))
+            {
+                writer.WriteLine($"{key} :\n {correctionQueue[key]}");
+                writer.WriteLine("-----------");
+            }
+        }
+
+        public void TransferTextToFocusedWindow(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
-
+            IntPtr focusedWindowHandle = GetForegroundWindow();
+            SetForegroundWindow(focusedWindowHandle);
             Clipboard.SetText(text);
             SendKeys.SendWait("^v");
-            Clipboard.Clear();
+
+            //Clipboard.Clear();
         }
 
         private void VoiceCommandRecognized(string command)
@@ -431,13 +504,45 @@ namespace LiveTranscribe_POC
             {
                 ShowOverlayWindow();
             }
+            else if (command.Equals("transfer my text", StringComparison.OrdinalIgnoreCase))
+            {
+
+                TransferTextToFocusedWindow(txtCorrected.Text);
+            }
         }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
 
         private void ShowOverlayWindow()
         {
             if (overlayWindow != null)
             {
-                overlayWindow.ShowDialog(this);
+
+                //            IntPtr focusedWindowHandle = GetForegroundWindow();
+
+                //          if (focusedWindowHandle != IntPtr.Zero)
+                {
+
+
+
+                    // Show the modal form
+                    //            overlayWindow.ShowDialog();
+
+
+                    overlayWindow.TopMost = true;
+
+                    // Show the modal form
+                    overlayWindow.Show();
+
+                    // Reset the TopMost property after showing the dialog
+                    overlayWindow.TopMost = false;
+                }
             }
         }
 
@@ -445,7 +550,7 @@ namespace LiveTranscribe_POC
         {
             if (WindowState == FormWindowState.Minimized)
             {
-                Hide();
+                //Hide();
                 notifyIcon.Visible = true;
                 notifyIcon.ShowBalloonTip(1000, "LiveTranscribe POC", "Running in background", ToolTipIcon.Info);
             }
@@ -468,6 +573,16 @@ namespace LiveTranscribe_POC
         private void Exit_Click(object sender, EventArgs e)
         {
             Application.Exit();
+        }
+
+        public void ClearAll()
+        {
+            txtCorrected.Text = "";
+            txtTranscribed.Text = "";
+            lastTranscribedText = "";
+            interimText = "";
+            transcribedIndex = 0;
+            correctedIndex = 0;
         }
     }
 }

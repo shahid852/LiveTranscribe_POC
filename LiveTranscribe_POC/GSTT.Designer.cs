@@ -47,6 +47,7 @@ namespace LiveTranscribe_POC
             this.btnStartStop.TabIndex = 0;
             this.btnStartStop.Text = "Start Recording";
             this.btnStartStop.UseVisualStyleBackColor = true;
+            this.btnStartStop.Visible = false;
             this.btnStartStop.Click += new System.EventHandler(this.btnStartStop_Click);
             // 
             // lblStatus
