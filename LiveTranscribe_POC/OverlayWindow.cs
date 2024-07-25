@@ -17,40 +17,36 @@ namespace LiveTranscribe_POC
             InitializeComponent();
         }
 
-        public void UpdateInterimFinalText(string text, bool IsInterim = true)
+        public void UpdateInterimFinalText(string new_text, bool IsInterim = true)
         {
 
-            lblInterimText.Text = text;
+            lblInterimText.Text = new_text;
 
-            if (IsInterim)
+            if (!IsInterim)
             {
                 if (txtCorrected.Text == "" || transcribedIndexOverlay == 0)
-                    txtCorrected.Text = text;
+                    txtCorrected.Text = new_text;
                 else
-                    txtCorrected.Text = txtCorrected.Text.Substring(0, transcribedIndexOverlay) + text;
-            }
-            else
-            {
+                    txtCorrected.Text = txtCorrected.Text.Substring(0, transcribedIndexOverlay) + new_text;
 
-                if (txtCorrected.Text == "" || transcribedIndexOverlay == 0)
-                    txtCorrected.Text = text;
-                else
-                    txtCorrected.Text = txtCorrected.Text.Substring(0, transcribedIndexOverlay) + text;
 
+                lblInterimText.Text = "";
                 transcribedIndexOverlay = txtCorrected.Text.Length; // update after changes
             }
+            txtCorrected.Select(txtCorrected.Text.Length, 0);
         }
 
-        public void UpdateCorrectedText(string text)
+        public void UpdateCorrectedText(string correctionKeyText)
         {
             IsProgrammaticChange = true;
-            int index = txtCorrected.Text.IndexOf(text);
-            Console.WriteLine(index);
-            if (index < 0) throw new Exception("text not found");
-            txtCorrected.Text = txtCorrected.Text.Replace(text, parentWindow.correctionQueue[text]);
+            //int index = txtCorrected.Text.IndexOf(correctionKeyText);
+            //Console.WriteLine(index);
+            //if (index < 0) throw new Exception("text not found");
+            txtCorrected.Text = txtCorrected.Text.Replace(correctionKeyText, parentWindow.correctionQueue[correctionKeyText]);
             transcribedIndexOverlay = txtCorrected.Text.Length; // update after changes
+            txtCorrected.Select(txtCorrected.Text.Length, 0);
 
-            parentWindow.LogCorrection(text);
+            parentWindow.LogCorrection(correctionKeyText);
 
             //parentWindow.correctionQueue.Remove(text);
 
@@ -67,7 +63,8 @@ namespace LiveTranscribe_POC
             //TransferClicked?.Invoke(txtCorrected.Text);
             this.DialogResult = DialogResult.OK;
             parentWindow.TransferTextToFocusedWindow(txtCorrected.Text);
-            this.Close();
+            this.Hide();
+            ClearAll();
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
@@ -82,6 +79,7 @@ namespace LiveTranscribe_POC
         {
             txtCorrected.Text = "";
             lblInterimText.Text = "";
+            transcribedIndexOverlay = 0;
             parentWindow.ClearAll();
         }
 

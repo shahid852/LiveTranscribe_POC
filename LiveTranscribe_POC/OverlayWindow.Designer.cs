@@ -40,60 +40,61 @@
             this.lblInterimText.Location = new System.Drawing.Point(24, 17);
             this.lblInterimText.Margin = new System.Windows.Forms.Padding(6, 0, 6, 0);
             this.lblInterimText.Name = "lblInterimText";
-            this.lblInterimText.Size = new System.Drawing.Size(124, 25);
-            this.lblInterimText.TabIndex = 0;
-            this.lblInterimText.Text = "Interim Text";
-            this.lblInterimText.Visible = false;
+            this.lblInterimText.Size = new System.Drawing.Size(0, 25);
+            this.lblInterimText.TabIndex = 1;
             // 
             // btnTransfer
             // 
+            this.btnTransfer.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.875F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnTransfer.Location = new System.Drawing.Point(934, 556);
             this.btnTransfer.Margin = new System.Windows.Forms.Padding(6);
             this.btnTransfer.Name = "btnTransfer";
             this.btnTransfer.Size = new System.Drawing.Size(150, 44);
             this.btnTransfer.TabIndex = 2;
-            this.btnTransfer.Text = "Transfer";
+            this.btnTransfer.Text = "&Transfer";
             this.btnTransfer.UseVisualStyleBackColor = true;
             this.btnTransfer.Click += new System.EventHandler(this.btnTransfer_Click);
             // 
             // btnCancel
             // 
+            this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnCancel.Location = new System.Drawing.Point(772, 556);
             this.btnCancel.Margin = new System.Windows.Forms.Padding(6);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(150, 44);
             this.btnCancel.TabIndex = 3;
-            this.btnCancel.Text = "Cancel";
+            this.btnCancel.Text = "&Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             // 
             // txtCorrected
             // 
-            this.txtCorrected.Location = new System.Drawing.Point(13, 45);
+            this.txtCorrected.Location = new System.Drawing.Point(13, 58);
             this.txtCorrected.Name = "txtCorrected";
-            this.txtCorrected.Size = new System.Drawing.Size(1071, 502);
-            this.txtCorrected.TabIndex = 4;
+            this.txtCorrected.Size = new System.Drawing.Size(1071, 489);
+            this.txtCorrected.TabIndex = 0;
             this.txtCorrected.Text = "";
             this.txtCorrected.TextChanged += new System.EventHandler(this.txtCorrected_TextChanged);
             // 
             // OverlayWindow
             // 
+            this.AcceptButton = this.btnTransfer;
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.CancelButton = this.btnCancel;
             this.ClientSize = new System.Drawing.Size(1099, 615);
-            this.ControlBox = false;
             this.Controls.Add(this.txtCorrected);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnTransfer);
             this.Controls.Add(this.lblInterimText);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Margin = new System.Windows.Forms.Padding(6);
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "OverlayWindow";
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
-            this.Text = "OverlayWindow";
+            this.Text = "Speech to Text";
             this.TopMost = true;
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.OverlayWindow_FormClosing);
             this.ResumeLayout(false);

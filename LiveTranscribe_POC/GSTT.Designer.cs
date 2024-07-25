@@ -31,11 +31,15 @@ namespace LiveTranscribe_POC
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(GSTT));
             this.btnStartStop = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.txtTranscribed = new System.Windows.Forms.TextBox();
             this.txtCorrected = new System.Windows.Forms.TextBox();
             this.notifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
+            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.contextMenuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
             // btnStartStop
@@ -84,23 +88,44 @@ namespace LiveTranscribe_POC
             // notifyIcon
             // 
             this.notifyIcon.BalloonTipText = "LiveTranscribe POC is running in the background.";
+            this.notifyIcon.ContextMenuStrip = this.contextMenuStrip1;
+            this.notifyIcon.Icon = ((System.Drawing.Icon)(resources.GetObject("notifyIcon.Icon")));
             this.notifyIcon.Text = "LiveTranscribe POC";
             this.notifyIcon.Visible = true;
             this.notifyIcon.DoubleClick += new System.EventHandler(this.notifyIcon_DoubleClick);
             // 
+            // contextMenuStrip1
+            // 
+            this.contextMenuStrip1.ImageScalingSize = new System.Drawing.Size(32, 32);
+            this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.exitToolStripMenuItem});
+            this.contextMenuStrip1.Name = "contextMenuStrip1";
+            this.contextMenuStrip1.Size = new System.Drawing.Size(126, 42);
+            // 
+            // exitToolStripMenuItem
+            // 
+            this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
+            this.exitToolStripMenuItem.Size = new System.Drawing.Size(125, 38);
+            this.exitToolStripMenuItem.Text = "Exit";
+            this.exitToolStripMenuItem.Click += new System.EventHandler(this.Exit_Click);
+            // 
             // GSTT
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
             this.ClientSize = new System.Drawing.Size(1950, 877);
             this.Controls.Add(this.txtCorrected);
             this.Controls.Add(this.txtTranscribed);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.btnStartStop);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4, 6, 4, 6);
             this.Name = "GSTT";
             this.Text = "LiveTranscribe POC";
+            this.WindowState = System.Windows.Forms.FormWindowState.Minimized;
+            this.ShowInTaskbar = false;
+            this.Hide();
             this.Resize += new System.EventHandler(this.GSTT_Resize);
+            this.contextMenuStrip1.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -118,5 +143,7 @@ namespace LiveTranscribe_POC
         private System.Windows.Forms.TextBox txtTranscribed;
         private System.Windows.Forms.TextBox txtCorrected;
         private System.Windows.Forms.NotifyIcon notifyIcon;
+        private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
+        private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
     }
 }

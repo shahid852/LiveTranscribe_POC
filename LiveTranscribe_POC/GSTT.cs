@@ -51,6 +51,7 @@ namespace LiveTranscribe_POC
         }
 
         private int _transcribedIndex;
+        private IntPtr focusedWindowHandle;
 
         public int transcribedIndex
         {
@@ -85,7 +86,7 @@ namespace LiveTranscribe_POC
             memoryStream = new MemoryStream();
             waveIn.DataAvailable += OnDataAvailable;
 
-            overlayWindow = new OverlayWindow();
+            overlayWindow = new OverlayWindow() { TopMost = true };
             overlayWindow.parentWindow = this;
             overlayWindow.TransferClicked += TransferTextToFocusedWindow;
 
@@ -237,7 +238,10 @@ namespace LiveTranscribe_POC
             this.interimText = interimText;
             txtTranscribed.Text = lastTranscribedText + " " + interimText;
 
-            overlayWindow.UpdateInterimFinalText(" "+interimText, IsInterim: true);
+            overlayWindow.UpdateInterimFinalText(" " + interimText, IsInterim: true);
+            
+            txtTranscribed.Select(txtTranscribed.Text.Length, 0); //move cursor to the end
+
         }
 
         public void ProcessFinalResult(string finalText, bool kbinput = false)
@@ -263,6 +267,7 @@ namespace LiveTranscribe_POC
 
                     SendForCorrection(sendForCorrection, kbinput);
                 }
+                txtTranscribed.Select(txtTranscribed.Text.Length, 0); //move cursor to the end
             }
         }
         private string makeReplacements(string text)
@@ -303,6 +308,7 @@ namespace LiveTranscribe_POC
                 correctionQueue[input_text] = "";
                 string correctedText = await CorrectGrammar(input_text);
                 txtCorrected.Text += correctedText;
+                txtCorrected.Select(txtCorrected.Text.Length, 0); //move cursor to the end
                 correctionQueue[input_text] = correctedText;
                 overlayWindow.UpdateCorrectedText(input_text);
             }
@@ -490,12 +496,14 @@ namespace LiveTranscribe_POC
         public void TransferTextToFocusedWindow(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
-            IntPtr focusedWindowHandle = GetForegroundWindow();
-            SetForegroundWindow(focusedWindowHandle);
+            //IntPtr focusedWindowHandle = GetForegroundWindow();
+            
             Clipboard.SetText(text);
+
+            SetForegroundWindow(focusedWindowHandle);
             SendKeys.SendWait("^v");
 
-            //Clipboard.Clear();
+            Clipboard.Clear();
         }
 
         private void VoiceCommandRecognized(string command)
@@ -524,9 +532,9 @@ namespace LiveTranscribe_POC
             if (overlayWindow != null)
             {
 
-                //            IntPtr focusedWindowHandle = GetForegroundWindow();
+               focusedWindowHandle = GetForegroundWindow();
 
-                //          if (focusedWindowHandle != IntPtr.Zero)
+               if (focusedWindowHandle != IntPtr.Zero)
                 {
 
 
@@ -535,13 +543,13 @@ namespace LiveTranscribe_POC
                     //            overlayWindow.ShowDialog();
 
 
-                    overlayWindow.TopMost = true;
+                    //overlayWindow.TopMost = true;
 
                     // Show the modal form
-                    overlayWindow.Show();
+                    overlayWindow.ShowDialog();
 
                     // Reset the TopMost property after showing the dialog
-                    overlayWindow.TopMost = false;
+                    //overlayWindow.TopMost = false;
                 }
             }
         }
@@ -550,26 +558,22 @@ namespace LiveTranscribe_POC
         {
             if (WindowState == FormWindowState.Minimized)
             {
-                //Hide();
+                Hide();
+                ShowInTaskbar = false;
                 notifyIcon.Visible = true;
-                notifyIcon.ShowBalloonTip(1000, "LiveTranscribe POC", "Running in background", ToolTipIcon.Info);
+                //notifyIcon.ShowBalloonTip(1000, "LiveTranscribe POC", "Running in background", ToolTipIcon.Info);
             }
         }
 
         private void notifyIcon_DoubleClick(object sender, EventArgs e)
         {
             Show();
-            WindowState = FormWindowState.Normal;
-            notifyIcon.Visible = false;
+            ShowInTaskbar = true;
+            WindowState = FormWindowState.Maximized;
+            //notifyIcon.Visible = false;
         }
 
-        private void Show_Click(object sender, EventArgs e)
-        {
-            Show();
-            WindowState = FormWindowState.Normal;
-            notifyIcon.Visible = false;
-        }
-
+        
         private void Exit_Click(object sender, EventArgs e)
         {
             Application.Exit();
@@ -583,6 +587,7 @@ namespace LiveTranscribe_POC
             interimText = "";
             transcribedIndex = 0;
             correctedIndex = 0;
+            correctionQueue.Clear();
         }
     }
 }
